@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Q for Word</title>
+<script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+<style>
+  :root { --bg:#F4F6F8; --card:#FFFFFF; --ink:#1F2A37; --muted:#566170; --line:#D9DEE5; --brand:#1F2A37; }
+  body { margin:0; font:14px/1.45 system-ui, "Segoe UI", sans-serif; background:var(--bg); color:var(--ink); }
+  header { background:#111827; color:#fff; padding:12px 16px; font-weight:700; letter-spacing:.08em; font-size:12px; }
+  main { padding:16px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px; margin-bottom:12px; }
+  h1 { font-size:18px; margin:0 0 6px; }
+  .muted { color:var(--muted); font-size:12.5px; }
+  button { background:var(--brand); color:#fff; border:0; border-radius:10px; padding:9px 14px; font-weight:600; cursor:pointer; }
+  ul { padding-left:18px; margin:8px 0 0; }
+  .stat { font-size:22px; font-weight:700; }
+</style>
+</head>
+<body>
+<header>Q · QUARTERMASTER INTELLIGENCE</header>
+<main>
+  <div class="card">
+    <h1>Q for Word: live read test</h1>
+    <div class="muted" id="status">Waiting for Word…</div>
+  </div>
+  <div class="card">
+    <button id="read" disabled>Read this document (R)</button>
+    <div id="out" class="muted" style="margin-top:10px">Read only. Nothing in the document is changed.</div>
+  </div>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+async function readDoc() {
+  try {
+    await Word.run(async ctx => {
+      const paras = ctx.document.body.paragraphs; paras.load("items/text,items/style,items/styleBuiltIn");
+      await ctx.sync();
+      const items = paras.items, text = items.map(p => p.text).join(" ");
+      const words = (text.match(/\S+/g) || []).length;
+      const heads = items.filter(p => /Heading/i.test(p.styleBuiltIn || "") || /Heading/i.test(p.style || "")).map(p => p.text.trim()).filter(Boolean).slice(0, 12);
+      const we = (text.match(/\b(we|our|in our opinion)\b/gi) || []).length;
+      const ph = (text.match(/###|XXX|\[[^\]]{1,60}\]/g) || []).length;
+      $("out").innerHTML =
+        `<div class="stat">${words.toLocaleString("en-AU")} words</div>` +
+        `<div>${items.length} paragraphs · ${heads.length} headings found</div>` +
+        `<div>"we / our" found: <b>${we}</b> · placeholders (### / XXX / [..]): <b>${ph}</b></div>` +
+        (heads.length ? `<ul>${heads.map(h => `<li>${h.replace(/[<&]/g, c => c === "<" ? "&lt;" : "&amp;")}</li>`).join("")}</ul>` : "");
+    });
+  } catch (e) { $("out").textContent = "Could not read: " + e.message; }
+}
+Office.onReady(info => {
+  if (info.host === Office.HostType.Word) {
+    $("status").textContent = "Connected to Word. Q can see the open document.";
+    $("read").disabled = false; $("read").onclick = readDoc;
+    document.addEventListener("keydown", e => { if (e.key === "r" || e.key === "R") readDoc(); });
+  } else { $("status").textContent = "Open this page from Word's add-in panel."; }
+});
+</script>
+</body>
+</html>
